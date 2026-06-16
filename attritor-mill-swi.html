@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Attritor Mill — Reactive Powder Disposal SWI</title>
+<meta name="theme-color" content="#E24B4A" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Mill SWI" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --red: #E24B4A; --red-light: #FCEBEB; --red-dark: #A32D2D;
+    --blue-light: #E6F1FB; --blue-mid: #185FA5;
+    --green: #1D9E75; --green-light: #E1F5EE; --green-dark: #085041;
+    --amber-light: #FAEEDA; --amber-mid: #BA7517; --amber-dark: #633806;
+    --bg: #ffffff; --bg2: #f5f5f3; --bg3: #efefed;
+    --text: #1a1a18; --text2: #5f5e5a; --text3: #888780;
+    --border: rgba(0,0,0,0.12); --border2: rgba(0,0,0,0.22);
+    --radius: 8px; --radius-lg: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1a; --bg2: #252523; --bg3: #2e2e2b;
+      --text: #f0ede6; --text2: #b4b2a9; --text3: #888780;
+      --border: rgba(255,255,255,0.12); --border2: rgba(255,255,255,0.22);
+      --red-light: #3a1212; --blue-light: #0b2340; --green-light: #062e20;
+      --amber-light: #2e1e06; --amber-dark: #f5c47a;
+    }
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg3); color: var(--text); min-height: 100vh; padding: 0 0 3rem; }
+
+  .top-bar { background: var(--red); color: white; padding: 10px 20px; font-size: 12px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+  .top-bar svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+  .card { background: var(--bg); border-radius: var(--radius-lg); border: 0.5px solid var(--border); margin: 16px; padding: 20px; }
+
+  .swi-header { border-left: 4px solid var(--red); padding-left: 14px; margin-bottom: 18px; }
+  .swi-eyebrow { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .swi-title { font-size: 20px; font-weight: 600; color: var(--text); line-height: 1.2; }
+  .swi-sub { font-size: 14px; color: var(--text2); margin-top: 3px; }
+
+  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+  .meta-cell { background: var(--bg2); border-radius: var(--radius); padding: 8px 12px; }
+  .meta-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 2px; }
+  .meta-val { font-size: 13px; color: var(--text); font-weight: 500; }
+
+  .warning-box { background: var(--amber-light); border: 0.5px solid #EF9F27; border-radius: var(--radius); padding: 12px 14px; margin-bottom: 18px; display: flex; gap: 10px; align-items: flex-start; }
+  .warning-icon { font-size: 20px; flex-shrink: 0; }
+  .warning-text { font-size: 13px; color: var(--amber-dark); line-height: 1.55; }
+  .warning-text strong { color: var(--amber-dark); }
+
+  .progress-label { font-size: 12px; color: var(--text3); margin-bottom: 5px; }
+  .progress-track { background: var(--bg2); border-radius: 20px; height: 5px; margin-bottom: 20px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--green); border-radius: 20px; transition: width 0.3s; width: 0%; }
+
+  .phase-card { background: var(--bg); border-radius: var(--radius-lg); border: 0.5px solid var(--border); margin: 0 16px 12px; overflow: hidden; }
+  .phase-header { display: flex; align-items: center; gap: 10px; padding: 14px 16px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
+  .phase-badge { font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 20px; white-space: nowrap; }
+  .p1 .phase-badge { background: var(--red-light); color: var(--red-dark); }
+  .p2 .phase-badge { background: var(--blue-light); color: var(--blue-mid); }
+  .p3 .phase-badge { background: var(--green-light); color: var(--green-dark); }
+  .phase-title { font-size: 15px; font-weight: 500; color: var(--text); flex: 1; }
+  .phase-chevron { color: var(--text3); transition: transform 0.2s; display: inline-block; }
+  .phase-chevron.open { transform: rotate(180deg); }
+  .phase-body { padding: 0 16px 16px; border-top: 0.5px solid var(--border); display: none; }
+  .phase-body.open { display: block; }
+
+  .ppe-title { font-size: 11px; font-weight: 500; color: var(--text2); text-transform: uppercase; letter-spacing: 0.04em; margin: 14px 0 8px; }
+  .ppe-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .ppe-pill { display: flex; align-items: center; gap: 5px; font-size: 12px; background: var(--bg2); border: 0.5px solid var(--border2); border-radius: 20px; padding: 4px 10px; color: var(--text2); }
+
+  .step { display: flex; gap: 10px; padding: 11px 0; border-bottom: 0.5px solid var(--border); align-items: flex-start; }
+  .step:last-child { border-bottom: none; }
+  .step-check { width: 24px; height: 24px; border: 1.5px solid var(--border2); border-radius: 5px; flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s, border-color 0.15s; -webkit-tap-highlight-color: transparent; }
+  .step-check.done { background: var(--green); border-color: var(--green); }
+  .step-check.done::after { content: '✓'; color: white; font-size: 14px; font-weight: 700; }
+  .step-num { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0; margin-top: 1px; }
+  .p1 .step-num { background: var(--red-light); color: var(--red-dark); }
+  .p2 .step-num { background: var(--blue-light); color: var(--blue-mid); }
+  .step-content { flex: 1; }
+  .step-text { font-size: 14px; color: var(--text); line-height: 1.55; }
+  .step-note { font-size: 12px; color: var(--text2); margin-top: 4px; line-height: 1.45; }
+  .caution { display: flex; align-items: flex-start; gap: 5px; font-size: 12px; color: var(--amber-dark); background: var(--amber-light); border-radius: 4px; padding: 5px 8px; margin-top: 6px; line-height: 1.4; }
+
+  .urgent-step .step-text { font-weight: 500; }
+  .urgent-banner { background: var(--red-light); border: 0.5px solid var(--red); border-radius: var(--radius); padding: 8px 12px; font-size: 12px; color: var(--red-dark); font-weight: 500; margin-bottom: 10px; margin-top: 14px; }
+
+  .sign-section { padding: 14px 16px; }
+  .sign-intro { font-size: 13px; color: var(--text2); margin-bottom: 14px; line-height: 1.5; }
+  .sign-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .sign-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+  .sign-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.04em; }
+  .sign-input { border: 0.5px solid var(--border2); border-radius: var(--radius); padding: 9px 11px; font-size: 14px; background: var(--bg); color: var(--text); font-family: inherit; width: 100%; }
+  .sign-input:focus { outline: none; border-color: var(--green); }
+  textarea.sign-input { resize: vertical; }
+  .sign-btn { display: block; width: 100%; padding: 13px; border-radius: var(--radius); border: 0.5px solid var(--green); background: var(--green-light); color: var(--green-dark); font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 12px; font-family: inherit; -webkit-tap-highlight-color: transparent; }
+  .sign-btn:active { opacity: 0.8; }
+  .signed-banner { display: none; background: var(--green-light); border: 0.5px solid var(--green); border-radius: var(--radius); padding: 12px 14px; font-size: 13px; color: var(--green-dark); margin-top: 10px; line-height: 1.7; }
+
+  @media (max-width: 400px) {
+    .meta-grid { grid-template-columns: 1fr; }
+    .sign-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  ERT — Controlled procedure — Air-reactive material
+</div>
+
+<div class="card">
+  <div class="swi-header">
+    <div class="swi-eyebrow">Standard work instruction</div>
+    <div class="swi-title">Attritor mill — reactive powder disposal</div>
+    <div class="swi-sub">Stuck pot removal, submersion &amp; ball recovery</div>
+  </div>
+
+  <div class="meta-grid">
+    <div class="meta-cell"><div class="meta-label">Performed by</div><div class="meta-val">ERT team (2-person min.)</div></div>
+    <div class="meta-cell"><div class="meta-label">Scope</div><div class="meta-val">Attritor mills — all units</div></div>
+    <div class="meta-cell"><div class="meta-label">Hazard</div><div class="meta-val">Air-reactive powder — fire/explosion risk</div></div>
+    <div class="meta-cell"><div class="meta-label">Duration</div><div class="meta-val">Day 1 + Day 3 return visit</div></div>
+  </div>
+
+  <div class="warning-box">
+    <div class="warning-icon">⚠️</div>
+    <div class="warning-text"><strong>Critical hazard:</strong> The pot has no lid when removed from the mill. The powder is immediately exposed to air the moment the pot leaves the mill. Oxidation, fire, or deflagration can occur within seconds. Transport to the water bin must be immediate and without any stops or delays. Two ERT personnel must be present at all times — no exceptions.</div>
+  </div>
+
+  <div class="progress-label" id="prog-label">Overall progress — 0 of 16 steps complete</div>
+  <div class="progress-track"><div class="progress-fill" id="prog-fill"></div></div>
+</div>
+
+<!-- PHASE 1 -->
+<div class="phase-card p1">
+  <div class="phase-header" onclick="togglePhase('p1')">
+    <span class="phase-badge">Phase 1 — Day 1</span>
+    <span class="phase-title">Pot removal, submersion &amp; agitation</span>
+    <span class="phase-chevron open" id="p1-chev">▾</span>
+  </div>
+  <div class="phase-body open" id="p1-body">
+
+    <div class="ppe-title">Required PPE — don before leaving prep area</div>
+    <div class="ppe-row">
+      <div class="ppe-pill">🦺 ERT suit &amp; hood</div>
+      <div class="ppe-pill">🥽 Full face shield</div>
+      <div class="ppe-pill">🧤 Fire-proof ERT gloves</div>
+      <div class="ppe-pill">👥 2-person rule — never alone</div>
+    </div>
+
+    <div class="step">
+      <div class="step-check" onclick="toggleStep(this,0)"></div>
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <div class="step-text">Confirm both ERT team members are present, fully suited, and signed in before approaching the mill.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-check" onclick="toggleStep(this,1)"></div>
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <div class="step-text">Position the water bin directly outside the building exit nearest to the attritor mill <strong>before</strong> approaching the mill. Confirm the bin is full of water.</div>
+        <div class="step-note">Water level must be sufficient to fully submerge the pot. Verify this before touching the mill. The route from mill to bin must be clear and unobstructed.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-check" onclick="toggleStep(this,2)"></div>
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <div class="step-text">Shut down and isolate the attritor mill following the standard lockout/tagout procedure. Confirm the mill has stopped completely before touching the pot.</div>
+      </div>
+    </div>
+
+    <div class="urgent-banner">⚡ Steps 4 and 5 must be completed together without any pause. The pot has no lid — powder is open to air as soon as it leaves the mill.</div>
+
+    <div class="step urgent-step">
+      <div class="step-check" onclick="toggleStep(this,3)"></div>
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <div class="step-text">Carefully remove the pot from the mill. Keep it upright and level at all times — do not tilt or tip. One operator holds the pot; the second operator immediately moves ahead to hold the exit door open.</div>
+        <div class="caution">⚠ The pot is open — powder is exposed to air from this moment. Move directly to the bin without stopping.</div>
+      </div>
+    </div>
+
+    <div class="step urgent-step">
+      <div class="step-check" onclick="toggleStep(this,4)"></div>
+      <div class="step-num">5</div>
+      <div class="step-content">
+        <div class="step-text">Carry the pot in a single direct movement to the water bin outside. Lower the pot into the water immediately — do not set it down anywhere en route.</div>
+        <div class="caution">⚠ Lower slowly and steadily to avoid splashing. Submerge fully before releasing.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-check" onclick="toggleStep(this,5)"></div>
+      <div class="step-num">6</div>
+      <div class="step-content">
+        <div class="step-text">Once the pot is fully submerged, agitate the contents using a long-handled tool. Stir vigorously so all powder and milling balls are completely wetted throughout.</div>
+        <div class="step-note">Continue agitation for a minimum of 2–3 minutes. Ensure no dry powder remains visible anywhere in the pot or on the bin floor.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-check" onclick="toggleStep(this,6)"></div>
+      <div class="step-num">7</div>
+      <div class="step-content">
+        <div class="step-text">Confirm pot remains fully submerged. Secure or cover the bin to prevent access by unauthorised personnel.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-check" onclick="toggleStep(this,7)"></div>
+      <div class="step-num">8</div>
+      <div class="step-content">
+        <div class="step-text">Record the date and time of submersion in the sign-off section. Leave the pot undisturbed for a minimum of 72 hours.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- PHASE 2 -->
+<div class="phase-card p2">
+  <div class="phase-header" onclick="togglePhase('p2')">
+    <span class="phase-badge">Phase 2 — Day 3</span>
+    <span class="phase-title">Pot retrieval, emptying &amp; ball recovery</span>
+    <span class="phase-chevron" id="p2-chev">▾</span>
+  </div>
+  <div class="phase-body" id="p2-body">
+
+    <div class="ppe-title">Required PPE — don before approaching the bin</div>
+    <div class="ppe-row">
+      <div class="ppe-pill">🦺 ERT suit &amp; hood</div>
+      <div class="ppe-pill">🥽 Full face shield</div>
+      <div class="ppe-pill">🧤 Fire-proof ERT gloves</div>
+      <div class="ppe-pill">👥 2-person rule — never alone</div>
+    </div>
+
+    <div class="step">
+      <div class="step-check" onclick="toggleStep(this,8)"></div>
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <div class="step-text">Confirm a minimum of 72 hours have elapsed since submersion. Check the Day 1 timestamp recorded in the sign-off section before proceeding.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-check" onclick="toggleStep(this,9)"></div>
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <div class="step-text">Both ERT team members to don full PPE as listed above before approaching the bin.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-check" onclick="toggleStep(this,10)"></div>
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <div class="step-text">Position the mesh/sieve receptacle securely beside the water bin, ready to receive the pot contents.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-check" onclick="toggleStep(this,11)"></div>
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <div class="step-text">Retrieve the pot from the water bin. Keep it low and stable — do not raise above waist height during transfer to the sieve.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-check" onclick="toggleStep(this,12)"></div>
+      <div class="step-num">5</div>
+      <div class="step-content">
+        <div class="step-text">Tip the pot contents — slurry and milling balls — into the mesh/sieve. Allow the slurry to drain through fully. Do not rush.</div>
+        <div class="step-note">Product slurry drains through the mesh. Milling balls are retained for collection.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-check" onclick="toggleStep(this,13)"></div>
+      <div class="step-num">6</div>
+      <div class="step-content">
+        <div class="step-text">Collect the milling balls from the sieve. Count must match the pre-run ball count recorded in the mill logbook before the pot is signed off.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-check" onclick="toggleStep(this,14)"></div>
+      <div class="step-num">7</div>
+      <div class="step-content">
+        <div class="step-text">Dispose of slurry water and residual product in accordance with the site waste disposal procedure for reactive materials.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-check" onclick="toggleStep(this,15)"></div>
+      <div class="step-num">8</div>
+      <div class="step-content">
+        <div class="step-text">Clean the pot and bin area. Return all equipment to designated storage. Remove and decontaminate PPE as per ERT decon procedure.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- SIGN-OFF -->
+<div class="phase-card p3">
+  <div class="phase-header" onclick="togglePhase('p3')">
+    <span class="phase-badge">Sign-off</span>
+    <span class="phase-title">Completion record</span>
+    <span class="phase-chevron open" id="p3-chev">▾</span>
+  </div>
+  <div class="phase-body open" id="p3-body">
+    <div class="sign-section">
+      <div class="sign-intro">Complete once all steps in both phases are finished. All fields are required before signing off.</div>
+      <div class="sign-grid">
+        <div class="sign-field">
+          <div class="sign-label">Operator 1 name</div>
+          <input class="sign-input" type="text" placeholder="Full name" id="op1" />
+        </div>
+        <div class="sign-field">
+          <div class="sign-label">Operator 2 name</div>
+          <input class="sign-input" type="text" placeholder="Full name" id="op2" />
+        </div>
+        <div class="sign-field">
+          <div class="sign-label">Supervisor name</div>
+          <input class="sign-input" type="text" placeholder="Full name" id="sup" />
+        </div>
+        <div class="sign-field">
+          <div class="sign-label">Mill / unit ID</div>
+          <input class="sign-input" type="text" placeholder="e.g. ATM-03" id="millid" />
+        </div>
+        <div class="sign-field">
+          <div class="sign-label">Day 1 — date &amp; time of submersion</div>
+          <input class="sign-input" type="datetime-local" id="d1date" />
+        </div>
+        <div class="sign-field">
+          <div class="sign-label">Day 3 — date &amp; time of completion</div>
+          <input class="sign-input" type="datetime-local" id="d3date" />
+        </div>
+      </div>
+      <div class="sign-field">
+        <div class="sign-label">Notes / observations</div>
+        <textarea class="sign-input" rows="3" placeholder="Any anomalies, observations, or deviations from this SWI..." id="notes"></textarea>
+      </div>
+      <button class="sign-btn" onclick="signOff()">✓ Confirm completion &amp; sign off</button>
+      <div class="signed-banner" id="signed-banner"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const TOTAL = 16;
+  const checked = new Array(TOTAL).fill(false);
+
+  function toggleStep(el, idx) {
+    checked[idx] = !checked[idx];
+    el.classList.toggle('done', checked[idx]);
+    updateProgress();
+  }
+
+  function updateProgress() {
+    const done = checked.filter(Boolean).length;
+    const pct = Math.round((done / TOTAL) * 100);
+    document.getElementById('prog-fill').style.width = pct + '%';
+    document.getElementById('prog-label').textContent = 'Overall progress — ' + done + ' of ' + TOTAL + ' steps complete';
+  }
+
+  function togglePhase(id) {
+    const body = document.getElementById(id + '-body');
+    const chev = document.getElementById(id + '-chev');
+    const isOpen = body.classList.contains('open');
+    body.classList.toggle('open', !isOpen);
+    chev.classList.toggle('open', !isOpen);
+  }
+
+  function signOff() {
+    const op1 = document.getElementById('op1').value.trim();
+    const op2 = document.getElementById('op2').value.trim();
+    const sup = document.getElementById('sup').value.trim();
+    const mill = document.getElementById('millid').value.trim();
+    const d1 = document.getElementById('d1date').value;
+    const d3 = document.getElementById('d3date').value;
+    if (!op1 || !op2 || !sup || !mill || !d1 || !d3) {
+      alert('Please complete all required fields before signing off.');
+      return;
+    }
+    const fmt = v => { try { return new Date(v).toLocaleString('en-IE', {dateStyle:'medium', timeStyle:'short'}); } catch(e) { return v; } };
+    const banner = document.getElementById('signed-banner');
+    banner.style.display = 'block';
+    banner.innerHTML = '✅ <strong>SWI complete.</strong><br>' +
+      'Unit: ' + mill + '<br>' +
+      'Operators: ' + op1 + ' &amp; ' + op2 + '<br>' +
+      'Supervisor: ' + sup + '<br>' +
+      'Submersion: ' + fmt(d1) + '&nbsp;&nbsp;|&nbsp;&nbsp;Completed: ' + fmt(d3);
+  }
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+</script>
+</body>
+</html>
